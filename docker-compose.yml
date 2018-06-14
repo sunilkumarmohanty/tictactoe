@@ -1,0 +1,23 @@
+version: "2"
+services:
+  tictactoe:
+    build:
+      context: .
+    container_name: tictactoe
+    depends_on:
+      - game-db
+    ports:
+      - "8080:8080"
+    environment:
+      SQL_CONN: host=game-db user=postgres sslmode=disable
+
+  game-db:
+    image: "postgres:9.6-alpine"
+    container_name: game-db
+    restart: "on-failure:5"
+    volumes:
+    - ./db:/pgdata
+    ports:
+      - "5432"
+    environment:
+      - PGDATA=/pgdata
