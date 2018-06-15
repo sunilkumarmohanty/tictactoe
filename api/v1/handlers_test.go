@@ -2,6 +2,7 @@ package v1
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -21,10 +22,11 @@ type mockDB struct {
 	game  *repository.Game
 	games []repository.Game
 
-	deleteErr   error // error while deleting
-	newErr      error // error while inserting
-	getGameErr  error // error while getting a game
-	getGamesErr error // error while getting all games
+	deleteErr     error // error while deleting
+	newErr        error // error while inserting
+	getGameErr    error // error while getting a game
+	getGamesErr   error // error while getting all games
+	updateGameErr error // error while updating a game
 	IRepository
 }
 
@@ -40,6 +42,10 @@ func (m *mockDB) GetGame(string) (*repository.Game, error) {
 
 func (m *mockDB) GetGames() ([]repository.Game, error) {
 	return m.games, m.getGamesErr
+}
+
+func (m *mockDB) UpdateGame(*repository.Game) (int64, error) {
+	return m.rowsAffected, m.updateGameErr
 }
 func TestHandlers_DeleteGameHandler(t *testing.T) {
 
@@ -210,7 +216,7 @@ func TestHandlers_CreateGameHandler(t *testing.T) {
 			}
 			mockHandler.repo = mockRepo
 
-			req, err := http.NewRequest("POST", hostURL, bytes.NewBuffer([]byte(tt.fields.body)))
+			req, err := http.NewRequest("PUT", hostURL, bytes.NewBuffer([]byte(tt.fields.body)))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -374,5 +380,269 @@ func TestHandlers_GetAllGamesHandler(t *testing.T) {
 				t.Errorf("response body did not match : got %v want %v", gotBody, tt.wantResponseBody)
 			}
 		})
+	}
+}
+
+func TestHandlers_UpdateGameHandler(t *testing.T) {
+	mockHandler := &Handlers{}
+	hostURL := "http://tictactoe/api/v1/games"
+	m := mux.NewRouter()
+	m.HandleFunc("/api/v1/games/{game_id}", mockHandler.UpdateGameHandler)
+	type fields struct {
+		gameID string
+		body   string
+
+		dbGame          *repository.Game
+		dbRowsAffected  int64
+		dbGetGameErr    error
+		dbUpdateGameErr error
+	}
+	type args struct {
+	}
+	tests := []struct {
+		name   string
+		fields fields
+
+		wantGameStatuses    []string
+		wantStatusCode      int
+		wantErrResponseBody string
+	}{
+		{
+			name: "Valid",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "--------X",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				body: `{"board": "-------OX"}`,
+			},
+			wantGameStatuses: []string{gameStatusRunning},
+			wantStatusCode:   http.StatusOK,
+		},
+		{
+			name: "Valid Human Win",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "OO-----XX",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				body: `{"board": "OOO----XX"}`,
+			},
+			wantGameStatuses: []string{gameStatusOWon},
+			wantStatusCode:   http.StatusOK,
+		},
+		{
+			name: "Valid Computer May Win",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "O------XX",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				body: `{"board": "OO-----XX"}`,
+			},
+			wantGameStatuses: []string{gameStatusXWon, gameStatusRunning},
+			wantStatusCode:   http.StatusOK,
+		},
+		{
+			name: "Valid Draw By Human",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "OXXXOO-OX",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				body: `{"board": "OXXXOOOOX"}`,
+			},
+			wantGameStatuses: []string{gameStatusDraw},
+			wantStatusCode:   http.StatusOK,
+		},
+		{
+			name: "Error from DB - Getting Old Game",
+			fields: fields{
+				gameID:       "dummy_game_id",
+				dbGetGameErr: errors.New("error getting game"),
+				body:         `{"board": "-------OX"}`,
+			},
+			wantStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name: "Error From DB - Saving New Game",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "--------X",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				dbUpdateGameErr: errors.New("error updating game"),
+				body:            `{"board": "-------OX"}`,
+			},
+			wantStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name: "Error From DB - Saving New Game - Human Won",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "OO-----XX",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				dbUpdateGameErr: errors.New("error updating game"),
+				body:            `{"board": "OOO----XX"}`,
+			},
+			wantStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name: "No Game Returned From DB",
+			fields: fields{
+				gameID: "dummy_game_id",
+				body:   `{"board": "-------OX"}`,
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			name: "Invalid JSON Body",
+			fields: fields{
+				gameID: "dummy_game_id",
+				body:   `"board": "-------OX"}`,
+			},
+			wantStatusCode:      http.StatusBadRequest,
+			wantErrResponseBody: `{"reason":"invalid request body"}`,
+		},
+		{
+			name: "Invalid Board",
+			fields: fields{
+				gameID: "dummy_game_id",
+				body:   `{"board": "-------OX-"}`,
+			},
+			wantStatusCode:      http.StatusBadRequest,
+			wantErrResponseBody: `{"reason":"invalid board"}`,
+		},
+		{
+			name: "Invalid Mark In Board",
+			fields: fields{
+				gameID: "dummy_game_id",
+				body:   `{"board": "-------OH"}`,
+			},
+			wantStatusCode:      http.StatusBadRequest,
+			wantErrResponseBody: `{"reason":"invalid board"}`,
+		},
+		{
+			name: "No Move Made",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "--------X",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				body: `{"board": "--------X"}`,
+			},
+			wantStatusCode:      http.StatusBadRequest,
+			wantErrResponseBody: `{"reason":"no move made"}`,
+		},
+		{
+			name: "Game Already Over",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "XXXOO----",
+					Status:       gameStatusXWon,
+					ComputerMark: "X",
+				},
+				body: `{"board": "XXXOOO---"}`,
+			},
+			wantStatusCode:      http.StatusBadRequest,
+			wantErrResponseBody: `{"reason":"game already over"}`,
+		},
+		{
+			name: "Invalid Move",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "-------OX",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				body: `{"board": "------XOX"}`,
+			},
+			wantStatusCode:      http.StatusBadRequest,
+			wantErrResponseBody: `{"reason":"game state mismatch"}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockDB{
+				getGameErr:    tt.fields.dbGetGameErr,
+				updateGameErr: tt.fields.dbUpdateGameErr,
+				game:          tt.fields.dbGame,
+			}
+			mockHandler.repo = mockRepo
+
+			getGameURL := fmt.Sprintf("%v/%v", hostURL, tt.fields.gameID)
+			req, err := http.NewRequest("POST", getGameURL, bytes.NewBuffer([]byte(tt.fields.body)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			recorder := httptest.NewRecorder()
+			m.ServeHTTP(recorder, req)
+			if recorder.Code != tt.wantStatusCode {
+				t.Errorf("status code did not match : got %v want %v", recorder.Code, tt.wantStatusCode)
+			}
+			gotBody := strings.TrimSpace(recorder.Body.String())
+
+			if recorder.Code != http.StatusOK {
+				if gotBody != tt.wantErrResponseBody {
+					t.Errorf("response body did not match : got %v want %v", gotBody, tt.wantErrResponseBody)
+				}
+			} else {
+				// Tests for 200
+				var game repository.Game
+				json.Unmarshal([]byte(gotBody), &game)
+				statusMatchFound := false
+				for _, status := range tt.wantGameStatuses {
+					if status == game.Status {
+						statusMatchFound = true
+					}
+				}
+
+				if !statusMatchFound {
+					t.Errorf("response game status did not match : got  %v want one of %v", game.Status, tt.wantGameStatuses)
+				}
+
+				if tt.fields.gameID != game.ID {
+					t.Errorf("response game id did not match : got  %v want %v", game.ID, tt.fields.gameID)
+				}
+				// Check if computer made the correct move
+				// First check if computer has to make any move
+				humanGame := &Game{}
+				json.Unmarshal([]byte(tt.fields.body), &humanGame)
+
+				if humanGame.getStatus() == gameStatusRunning {
+					computerGame := &Game{game.Board}
+					if computerGame.validatePlay(humanGame, findOpponentMark((tt.fields.dbGame.ComputerMark))) != 1 {
+						t.Errorf("invalid move made by computer")
+					}
+				}
+			}
+		})
+
 	}
 }

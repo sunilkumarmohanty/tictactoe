@@ -105,11 +105,13 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Error("invalid body while updating game", zap.Error(err))
 		sendJSONError(rw, http.StatusBadRequest, "invalid request body")
+		return
 	}
 	//Validate board
 	if !curGame.validateBoard() {
 		logger.Error("invalid board", zap.Any("game", curGame))
 		sendJSONError(rw, http.StatusBadRequest, "invalid board")
+		return
 	}
 	//Check if game exists
 	storedState, err := h.repo.GetGame(gameID)
@@ -126,6 +128,7 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	if storedState.Status != gameStatusRunning {
 		logger.Error("game already over", zap.Error(err))
 		sendJSONError(rw, http.StatusBadRequest, "game already over")
+		return
 	}
 	//Check if play is valid
 	playStatus := curGame.validatePlay(&Game{
@@ -200,9 +203,3 @@ func sendJSONError(rw http.ResponseWriter, code int, reason string) {
 	rw.WriteHeader(code)
 	json.NewEncoder(rw).Encode(errorResp)
 }
-
-// func sendTextError(rw http.ResponseWriter, code int, message string) {
-// 	rw.Header().Set("Content-Type", "text/html")
-// 	rw.WriteHeader(code)
-// 	rw.Write([]byte(message))
-// }

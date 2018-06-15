@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"log"
 	"math/rand"
 	"strings"
 	"time"
@@ -96,7 +95,6 @@ func (g *Game) validatePlay(prevState *Game, curPlayerMark string) int {
 }
 
 func (g *Game) play(mark string) {
-	log.Println("playing", mark)
 	moves := strings.Split(g.Board, "")
 	validPositions := findBlankPositions(moves)
 	if len(validPositions) > 0 {
@@ -129,7 +127,7 @@ func (g *Game) getStatus() string {
 	}
 	//diagonal check
 	if moves[2] == moves[4] && moves[2] == moves[6] && moves[2] != fMark {
-		winner = moves[0]
+		winner = moves[2]
 	}
 	if winner == xMark {
 		return gameStatusXWon
