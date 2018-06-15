@@ -9,23 +9,25 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type repository struct {
+// Repository represents the database
+type Repository struct {
 	db *sql.DB
 }
 
-// New initialises the Repository struct and conects to the database
-func New(sqlConn string) (*repository, error) {
+// New initialises the Database struct and conects to the database
+func New(sqlConn string) (*Repository, error) {
 	db, err := connectDatabase(sqlConn)
 	if err != nil {
 		logger.Error("error connecting to db", zap.Error(err))
 		return nil, err
 	}
-	return &repository{
+	return &Repository{
 		db: db,
 	}, nil
 }
 
-func (r *repository) NewGame(computerMark, board string) (string, error) {
+// NewGame inserts a new game to db
+func (r *Repository) NewGame(computerMark, board string) (string, error) {
 
 	query := `INSERT INTO games (computer_mark, board, status) VALUES ($1, $2, $3) RETURNING id`
 	result := r.db.QueryRow(query, computerMark, board, "RUNNING")
@@ -38,7 +40,8 @@ func (r *repository) NewGame(computerMark, board string) (string, error) {
 	return gameID, nil
 }
 
-func (r *repository) GetGames() ([]Game, error) {
+// GetGames gets all the games
+func (r *Repository) GetGames() ([]Game, error) {
 	games := []Game{}
 	//paging ignored for the timebeing
 	query := "SELECT id, board, status, computer_mark FROM games"
@@ -60,7 +63,9 @@ func (r *repository) GetGames() ([]Game, error) {
 	}
 	return games, nil
 }
-func (r *repository) GetGame(id string) (*Game, error) {
+
+// GetGame gets a single game
+func (r *Repository) GetGame(id string) (*Game, error) {
 	game := Game{}
 	query := "SELECT id, board, status, computer_mark FROM games WHERE id = $1"
 	row := r.db.QueryRow(query, id)
@@ -78,7 +83,8 @@ func (r *repository) GetGame(id string) (*Game, error) {
 	return &game, nil
 }
 
-func (r *repository) UpdateGame(game *Game) (int64, error) {
+// UpdateGame updates the game
+func (r *Repository) UpdateGame(game *Game) (int64, error) {
 	query := "UPDATE games SET board = $2, status = $3 WHERE id = $1;"
 	result, err := r.db.Exec(query, game.ID, game.Board, game.Status)
 	if err != nil {
@@ -93,7 +99,9 @@ func (r *repository) UpdateGame(game *Game) (int64, error) {
 
 	return rowsAffected, nil
 }
-func (r *repository) DeleteGame(id string) (int64, error) {
+
+// DeleteGame deletes the game
+func (r *Repository) DeleteGame(id string) (int64, error) {
 	query := "DELETE FROM games WHERE id = $1"
 	result, err := r.db.Exec(query, id)
 	if err != nil {
