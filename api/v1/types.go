@@ -2,6 +2,8 @@ package v1
 
 import "github.com/sunilkumarmohanty/tictactoe/repository"
 
+// IRepository is used as an interface for storing record in a repository
+// Using it also makes it easier to write Unit test cases
 type IRepository interface {
 	GetGames() ([]repository.Game, error)
 	GetGame(string) (*repository.Game, error)

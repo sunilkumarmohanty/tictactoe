@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Game represent the tic tac toe game
 type Game struct {
 	Board string `json:"board,omitempty"`
 }

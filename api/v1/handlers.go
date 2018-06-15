@@ -22,10 +22,12 @@ const (
 	fMark = "-"
 )
 
+// Handlers represent the game handlers
 type Handlers struct {
 	repo IRepository
 }
 
+// New initialises the handlers struct
 func New() *Handlers {
 	logger.Info("Creating handlers")
 	sqlConn := os.Getenv("SQL_CONN")
@@ -41,6 +43,7 @@ func New() *Handlers {
 	}
 }
 
+// GetAllGamesHandler returns all the games stored in the database
 func (h *Handlers) GetAllGamesHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	games, err := h.repo.GetGames()
@@ -52,6 +55,7 @@ func (h *Handlers) GetAllGamesHandler(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(games)
 }
 
+// GetGameHandler returns an instance of a single game
 func (h *Handlers) GetGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
@@ -69,6 +73,7 @@ func (h *Handlers) GetGameHandler(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(game)
 }
 
+// CreateGameHandler creates a new game
 func (h *Handlers) CreateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	newGame := &Game{}
@@ -97,6 +102,7 @@ func (h *Handlers) CreateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	sendJSONError(rw, http.StatusBadRequest, "invalid new board")
 }
 
+// UpdateGameHandler handles a move made by human and if required makes the computer move. It also saves the result in db
 func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	gameID := mux.Vars(r)["game_id"]
@@ -146,7 +152,6 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// If game is in RUNNING state then make our move.
-	// humanMark := findOpponentMark(storedState.ComputerMark)
 	status := curGame.getStatus()
 	if status != gameStatusRunning {
 		dbGame := &repository.Game{
@@ -180,6 +185,7 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// DeleteGameHandler deletes a game from the db
 func (h *Handlers) DeleteGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)

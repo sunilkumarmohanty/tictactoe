@@ -2,10 +2,10 @@ package repository
 
 import (
 	"database/sql"
-
+	// blank import for registering the migration files driver
 	_ "github.com/golang-migrate/migrate/source/file"
 	"go.uber.org/zap"
-
+	// blank import for registering the postgres driver
 	_ "github.com/lib/pq"
 )
 
@@ -13,6 +13,7 @@ type repository struct {
 	db *sql.DB
 }
 
+// New initialises the Repository struct and conects to the database
 func New(sqlConn string) (*repository, error) {
 	db, err := connectDatabase(sqlConn)
 	if err != nil {
