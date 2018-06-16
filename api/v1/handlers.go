@@ -2,7 +2,9 @@ package v1
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/gorilla/mux"
@@ -24,7 +26,8 @@ const (
 
 // Handlers represent the game handlers
 type Handlers struct {
-	repo IRepository
+	repo        IRepository
+	hostAddress string
 }
 
 // New initialises the handlers struct
@@ -34,12 +37,20 @@ func New() *Handlers {
 	if len(sqlConn) == 0 {
 		logger.Fatal("SQL_CONN not set")
 	}
+
+	hostAddress := os.Getenv("HOST_ADDR")
+	_, err := url.Parse(hostAddress)
+	if err != nil {
+		logger.Fatal("invalid HOST_ADDR in environment variable")
+	}
 	repo, err := repository.New(sqlConn)
 	if err != nil {
 		logger.Fatal("Unable to create repository")
 	}
+
 	return &Handlers{
-		repo: repo,
+		repo:        repo,
+		hostAddress: hostAddress,
 	}
 }
 
@@ -73,7 +84,7 @@ func (h *Handlers) GetGameHandler(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(game)
 }
 
-// CreateGameHandler creates a new game
+// CreateGameHandler creates a new game+v
 func (h *Handlers) CreateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	newGame := &Game{}
@@ -93,7 +104,7 @@ func (h *Handlers) CreateGameHandler(rw http.ResponseWriter, r *http.Request) {
 			return
 		}
 		resp := newGameResponse{
-			Location: gameID,
+			Location: fmt.Sprintf("%s/%s/%s", h.hostAddress, "api/v1/games", gameID),
 		}
 		rw.WriteHeader(http.StatusCreated)
 		json.NewEncoder(rw).Encode(resp)
@@ -131,6 +142,7 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
+	// Check if game is still in play as per stored state
 	if storedState.Status != gameStatusRunning {
 		logger.Error("game already over", zap.Error(err))
 		sendJSONError(rw, http.StatusBadRequest, "game already over")

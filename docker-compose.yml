@@ -10,6 +10,8 @@ services:
       - "8080:8080"
     environment:
       SQL_CONN: host=game-db user=postgres sslmode=disable
+      HOST_ADDR: http://localhost:8080
+      PORT: 8080
 
   game-db:
     image: "postgres:9.6-alpine"

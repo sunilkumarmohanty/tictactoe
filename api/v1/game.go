@@ -95,6 +95,7 @@ func (g *Game) validatePlay(prevState *Game, curPlayerMark string) int {
 	return diffs
 }
 
+// play checks for blank positions and randomly selects a blank space and makes it move
 func (g *Game) play(mark string) {
 	moves := strings.Split(g.Board, "")
 	validPositions := findBlankPositions(moves)

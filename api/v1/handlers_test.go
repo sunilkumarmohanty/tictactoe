@@ -114,9 +114,11 @@ func TestHandlers_DeleteGameHandler(t *testing.T) {
 }
 
 func TestHandlers_CreateGameHandler(t *testing.T) {
-	mockHandler := &Handlers{}
-	hostURL := "http://tictactoe/api/v1/games"
-	_ = hostURL
+
+	hostURL := "http://tictactoe"
+	mockHandler := &Handlers{
+		hostAddress: hostURL,
+	}
 	m := mux.NewRouter()
 	m.HandleFunc("/api/v1/games", mockHandler.CreateGameHandler)
 	type fields struct {
@@ -140,7 +142,7 @@ func TestHandlers_CreateGameHandler(t *testing.T) {
 				body:     `{"board": "--------X"}`,
 			},
 			wantStatusCode:   http.StatusCreated,
-			wantResponseBody: `{"location":"dummy_game_id"}`,
+			wantResponseBody: `{"location":"` + hostURL + `/api/v1/games/dummy_game_id"}`,
 		},
 		{
 			name: "Valid Blank Board",
@@ -149,7 +151,7 @@ func TestHandlers_CreateGameHandler(t *testing.T) {
 				body:     `{"board": "---------"}`,
 			},
 			wantStatusCode:   http.StatusCreated,
-			wantResponseBody: `{"location":"dummy_game_id"}`,
+			wantResponseBody: `{"location":"` + hostURL + `/api/v1/games/dummy_game_id"}`,
 		},
 		{
 			name: "Error from DB",
@@ -216,7 +218,7 @@ func TestHandlers_CreateGameHandler(t *testing.T) {
 			}
 			mockHandler.repo = mockRepo
 
-			req, err := http.NewRequest("PUT", hostURL, bytes.NewBuffer([]byte(tt.fields.body)))
+			req, err := http.NewRequest("PUT", hostURL+"/api/v1/games", bytes.NewBuffer([]byte(tt.fields.body)))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -313,7 +315,6 @@ func TestHandlers_GetGameHandler(t *testing.T) {
 func TestHandlers_GetAllGamesHandler(t *testing.T) {
 	mockHandler := &Handlers{}
 	hostURL := "http://tictactoe/api/v1/games"
-	_ = hostURL
 	m := mux.NewRouter()
 	m.HandleFunc("/api/v1/games", mockHandler.GetAllGamesHandler)
 	type fields struct {
