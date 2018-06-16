@@ -14,7 +14,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build --ldflags "-s -w" -o app cmd/main.go
 
 
 FROM alpine:3.7
-RUN apk add --update --no-cache ca-certificates
 
 RUN addgroup -S tictactoe && adduser -S -G tictactoe tictactoe
 RUN mkdir -p /home/tictactoe
