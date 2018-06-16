@@ -21,6 +21,7 @@ const (
 )
 
 func (g *Game) validateNewGame() (string, bool) {
+	//check for the length of the board
 	if len(g.Board) != 9 {
 		logger.Error("invalid board", zap.String("board", g.Board))
 
@@ -28,6 +29,8 @@ func (g *Game) validateNewGame() (string, bool) {
 	}
 	xMoves, oMoves := 0, 0
 	moves := strings.Split(g.Board, "")
+	// The number of moves should be less than equal to 1
+	// Only X, O and - allowed in the board
 	for _, move := range moves {
 		switch move {
 		case xMark:
@@ -56,6 +59,7 @@ func (g *Game) validateNewGame() (string, bool) {
 }
 
 func (g *Game) validateBoard() bool {
+	// check for length of board
 	if len(g.Board) != 9 {
 		logger.Error("invalid board", zap.String("board", g.Board))
 		return false
@@ -85,6 +89,7 @@ func (g *Game) validatePlay(prevState *Game, curPlayerMark string) int {
 	diffs := 0
 	for indx, move := range curMoves {
 		if move != prevMoves[indx] {
+			// check if opponent has made a valid move with respect to mark and number of moves
 			if move != opponentMark || diffs == 1 {
 				//the play does not complement to its previous state if there are more than 1 diff
 				return -1
@@ -99,7 +104,9 @@ func (g *Game) validatePlay(prevState *Game, curPlayerMark string) int {
 func (g *Game) play(mark string) {
 	moves := strings.Split(g.Board, "")
 	validPositions := findBlankPositions(moves)
+	// make move only when valid position found
 	if len(validPositions) > 0 {
+		// randomly select a blank valid position
 		rand := rand.New(rand.NewSource(time.Now().UnixNano()))
 		randomMovePosition := validPositions[rand.Intn(len(validPositions))]
 		moves[randomMovePosition] = mark

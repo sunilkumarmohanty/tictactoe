@@ -418,13 +418,45 @@ func TestHandlers_UpdateGameHandler(t *testing.T) {
 					Status:       "RUNNING",
 					ComputerMark: "X",
 				},
-				body: `{"board": "-------OX"}`,
+				dbRowsAffected: 1,
+				body:           `{"board": "-------OX"}`,
 			},
 			wantGameStatuses: []string{gameStatusRunning},
 			wantStatusCode:   http.StatusOK,
 		},
 		{
-			name: "Valid Human Win",
+			name: "Valid Game Got Deleted While Making Move",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "--------X",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				dbRowsAffected: 0,
+				body:           `{"board": "-------OX"}`,
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+		{
+			name: "Valid Opponent Win",
+			fields: fields{
+				gameID: "dummy_game_id",
+				dbGame: &repository.Game{
+					ID:           "dummy_game_id",
+					Board:        "OO-----XX",
+					Status:       "RUNNING",
+					ComputerMark: "X",
+				},
+				dbRowsAffected: 1,
+				body:           `{"board": "OOO----XX"}`,
+			},
+			wantGameStatuses: []string{gameStatusOWon},
+			wantStatusCode:   http.StatusOK,
+		},
+		{
+			name: "Valid Opponent Win. Game Got Deleted While Checking Status ",
 			fields: fields{
 				gameID: "dummy_game_id",
 				dbGame: &repository.Game{
@@ -436,7 +468,7 @@ func TestHandlers_UpdateGameHandler(t *testing.T) {
 				body: `{"board": "OOO----XX"}`,
 			},
 			wantGameStatuses: []string{gameStatusOWon},
-			wantStatusCode:   http.StatusOK,
+			wantStatusCode:   http.StatusNotFound,
 		},
 		{
 			name: "Valid Computer May Win",
@@ -448,13 +480,14 @@ func TestHandlers_UpdateGameHandler(t *testing.T) {
 					Status:       "RUNNING",
 					ComputerMark: "X",
 				},
-				body: `{"board": "OO-----XX"}`,
+				dbRowsAffected: 1,
+				body:           `{"board": "OO-----XX"}`,
 			},
 			wantGameStatuses: []string{gameStatusXWon, gameStatusRunning},
 			wantStatusCode:   http.StatusOK,
 		},
 		{
-			name: "Valid Draw By Human",
+			name: "Valid Draw By Opponent",
 			fields: fields{
 				gameID: "dummy_game_id",
 				dbGame: &repository.Game{
@@ -463,7 +496,8 @@ func TestHandlers_UpdateGameHandler(t *testing.T) {
 					Status:       "RUNNING",
 					ComputerMark: "X",
 				},
-				body: `{"board": "OXXXOOOOX"}`,
+				dbRowsAffected: 1,
+				body:           `{"board": "OXXXOOOOX"}`,
 			},
 			wantGameStatuses: []string{gameStatusDraw},
 			wantStatusCode:   http.StatusOK,
@@ -493,7 +527,7 @@ func TestHandlers_UpdateGameHandler(t *testing.T) {
 			wantStatusCode: http.StatusInternalServerError,
 		},
 		{
-			name: "Error From DB - Saving New Game - Human Won",
+			name: "Error From DB - Saving New Game - Opponent Won",
 			fields: fields{
 				gameID: "dummy_game_id",
 				dbGame: &repository.Game{
@@ -594,6 +628,7 @@ func TestHandlers_UpdateGameHandler(t *testing.T) {
 				getGameErr:    tt.fields.dbGetGameErr,
 				updateGameErr: tt.fields.dbUpdateGameErr,
 				game:          tt.fields.dbGame,
+				rowsAffected:  tt.fields.dbRowsAffected,
 			}
 			mockHandler.repo = mockRepo
 
@@ -633,12 +668,12 @@ func TestHandlers_UpdateGameHandler(t *testing.T) {
 				}
 				// Check if computer made the correct move
 				// First check if computer has to make any move
-				humanGame := &Game{}
-				json.Unmarshal([]byte(tt.fields.body), &humanGame)
+				oppGame := &Game{}
+				json.Unmarshal([]byte(tt.fields.body), &oppGame)
 
-				if humanGame.getStatus() == gameStatusRunning {
+				if oppGame.getStatus() == gameStatusRunning {
 					computerGame := &Game{game.Board}
-					if computerGame.validatePlay(humanGame, findOpponentMark((tt.fields.dbGame.ComputerMark))) != 1 {
+					if computerGame.validatePlay(oppGame, findOpponentMark((tt.fields.dbGame.ComputerMark))) != 1 {
 						t.Errorf("invalid move made by computer")
 					}
 				}

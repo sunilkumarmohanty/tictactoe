@@ -21,7 +21,7 @@ const (
 const (
 	xMark = "X"
 	oMark = "O"
-	fMark = "-"
+	fMark = "-" //blank position
 )
 
 // Handlers represent the game handlers
@@ -69,15 +69,16 @@ func (h *Handlers) GetAllGamesHandler(rw http.ResponseWriter, r *http.Request) {
 // GetGameHandler returns an instance of a single game
 func (h *Handlers) GetGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	vars := mux.Vars(r)
-	game, err := h.repo.GetGame(vars["game_id"])
+	params := mux.Vars(r)
+	game, err := h.repo.GetGame(params["game_id"])
 	if err != nil {
 		logger.Error("unable to get game", zap.Error(err))
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	// game not found
 	if game == nil {
-		logger.Error("game not found", zap.String("gameid", vars["game_id"]))
+		logger.Error("game not found", zap.String("gameid", params["game_id"]))
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -95,8 +96,11 @@ func (h *Handlers) CreateGameHandler(rw http.ResponseWriter, r *http.Request) {
 		sendJSONError(rw, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	// Check if the new board is valid. Of valid, then make a move and save the state
 	if computerMark, ok := newGame.validateNewGame(); ok {
+		// computer makes the move
 		newGame.play(computerMark)
+		// save the game
 		gameID, err := h.repo.NewGame(computerMark, newGame.Board)
 		if err != nil {
 			logger.Error("game creation failed", zap.Error(err))
@@ -113,7 +117,7 @@ func (h *Handlers) CreateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	sendJSONError(rw, http.StatusBadRequest, "invalid new board")
 }
 
-// UpdateGameHandler handles a move made by human and if required makes the computer move. It also saves the result in db
+// UpdateGameHandler handles a move made by opponent and if required makes the computer move. It also saves the result in db
 func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	gameID := mux.Vars(r)["game_id"]
@@ -148,7 +152,7 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 		sendJSONError(rw, http.StatusBadRequest, "game already over")
 		return
 	}
-	//Check if play is valid
+	//Check if play made by opponent is valid
 	playStatus := curGame.validatePlay(&Game{
 		Board: storedState.Board,
 	}, storedState.ComputerMark)
@@ -171,10 +175,16 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 			Board:  curGame.Board,
 			Status: status,
 		}
-		_, err := h.repo.UpdateGame(dbGame)
+		recordsAffected, err := h.repo.UpdateGame(dbGame)
 		if err != nil {
 			logger.Error("game update failed", zap.Error(err))
 			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		// recordsAffected will be 0 only when the game gets deleted during the time the computer is checking the status. This is an extreme corner case and will occur in rare scenario.
+		if recordsAffected == 0 {
+			logger.Error("game not found", zap.String("gameid", gameID))
+			rw.WriteHeader(http.StatusNotFound)
 			return
 		}
 		json.NewEncoder(rw).Encode(dbGame)
@@ -187,10 +197,16 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 		Board:  curGame.Board,
 		Status: status,
 	}
-	_, err = h.repo.UpdateGame(dbGame)
+	recordsAffected, err := h.repo.UpdateGame(dbGame)
 	if err != nil {
 		logger.Error("game update failed", zap.Error(err))
 		rw.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// recordsAffected will be 0 only when the game gets deleted during the time the computer is deciding to make a move. This is a corner case and will occur in rare scenario.
+	if recordsAffected == 0 {
+		logger.Error("game not found", zap.String("gameid", gameID))
+		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
 	json.NewEncoder(rw).Encode(dbGame)
@@ -200,15 +216,15 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 // DeleteGameHandler deletes a game from the db
 func (h *Handlers) DeleteGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	vars := mux.Vars(r)
-	rowsAffected, err := h.repo.DeleteGame(vars["game_id"])
+	params := mux.Vars(r)
+	rowsAffected, err := h.repo.DeleteGame(params["game_id"])
 	if err != nil {
 		logger.Error("game deletion failed", zap.Error(err))
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if rowsAffected == 0 {
-		logger.Error("game not found", zap.String("gameid", vars["game_id"]))
+		logger.Error("game not found", zap.String("gameid", params["game_id"]))
 		rw.WriteHeader(http.StatusNotFound)
 		return
 	}
