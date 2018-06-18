@@ -5,7 +5,7 @@
 
 Create a REST based backend for a game of tic-tac-toe.
 
-## Execute
+## Start the game
 
 To run the backend, simply run
 
@@ -24,6 +24,7 @@ docker-commpose up
 
 ## Design decisions
 
-* The computer selects randomly a vacant position from the board
+* The computer randomly selects a vacant position from the board. It is a random player and does not intentionally try to win
 * The state of the game is stored in a postgres sql database
 * Migration scripts for the postgres database can be found in [migrations](repository/migrations) folder
+* Environment variables for the game app and the db are configured in the docker-compose file and can be changed as per need
