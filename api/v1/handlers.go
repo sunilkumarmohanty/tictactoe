@@ -59,7 +59,7 @@ func (h *Handlers) GetAllGamesHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	games, err := h.repo.GetGames()
 	if err != nil {
-		logger.Error("unable to get game", zap.Error(err))
+		logger.Error("unable to get games", zap.Error(err))
 		rw.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +85,7 @@ func (h *Handlers) GetGameHandler(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(game)
 }
 
-// CreateGameHandler creates a new game+v
+// CreateGameHandler creates a new game
 func (h *Handlers) CreateGameHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	newGame := &Game{}
@@ -96,7 +96,7 @@ func (h *Handlers) CreateGameHandler(rw http.ResponseWriter, r *http.Request) {
 		sendJSONError(rw, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	// Check if the new board is valid. Of valid, then make a move and save the state
+	// Check if the new board is valid. If valid, then make a move and save the state
 	if computerMark, ok := newGame.validateNewGame(); ok {
 		// computer makes the move
 		newGame.play(computerMark)
@@ -152,7 +152,7 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 		sendJSONError(rw, http.StatusBadRequest, "game already over")
 		return
 	}
-	//Check if play made by opponent is valid
+	//Check if play made by opponent is valid. Compare the game with the previous stat
 	playStatus := curGame.validatePlay(&Game{
 		Board: storedState.Board,
 	}, storedState.ComputerMark)
@@ -169,6 +169,7 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 
 	// If game is in RUNNING state then make our move.
 	status := curGame.getStatus()
+	// If not running then opponent has either won or drawn
 	if status != gameStatusRunning {
 		dbGame := &repository.Game{
 			ID:     gameID,
@@ -190,6 +191,7 @@ func (h *Handlers) UpdateGameHandler(rw http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(rw).Encode(dbGame)
 		return
 	}
+	// game is running and now computer can make its move
 	curGame.play(storedState.ComputerMark)
 	status = curGame.getStatus()
 	dbGame := &repository.Game{

@@ -20,6 +20,7 @@ const (
 	gameStatusDraw    = "DRAW"
 )
 
+// validateNewGame validates the new board and returns computer mark and if the board is OK
 func (g *Game) validateNewGame() (string, bool) {
 	//check for the length of the board
 	if len(g.Board) != 9 {
